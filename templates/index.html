@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBT-2 AI Chatbot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="chat-app">
+        <!-- Header -->
+        <div class="header">
+            <h1>
+                <i class="fas fa-robot"></i>
+                GBT-2 AI Assistant
+            </h1>
+            <div class="header-controls">
+                <button class="btn theme-btn" onclick="toggleTheme()">
+                    <i class="fas fa-palette"></i> Theme
+                </button>
+                <button class="btn clear-btn" onclick="clearChat()">
+                    <i class="fas fa-trash"></i> Clear
+                </button>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="messages-container" id="messages">
+            <!-- Messages will be added here -->
+        </div>
+
+        <!-- Quick Suggestions -->
+        <div class="suggestions">
+            <button class="suggestion-btn" onclick="sendSuggestion('Hello! How are you today?')">
+                <i class="fas fa-hand-wave"></i> Hello! How are you?
+            </button>
+            <button class="suggestion-btn" onclick="sendSuggestion('Tell me a funny joke')">
+                <i class="fas fa-laugh"></i> Tell me a joke
+            </button>
+            <button class="suggestion-btn" onclick="sendSuggestion('What can you help me with?')">
+                <i class="fas fa-question-circle"></i> What can you do?
+            </button>
+            <button class="suggestion-btn" onclick="sendSuggestion('Explain artificial intelligence')">
+                <i class="fas fa-brain"></i> Explain AI
+            </button>
+            <button class="suggestion-btn" onclick="sendSuggestion('Give me life advice')">
+                <i class="fas fa-lightbulb"></i> Life advice
+            </button>
+            <button class="suggestion-btn" onclick="sendSuggestion('Tell me about yourself')">
+                <i class="fas fa-robot"></i> About you
+            </button>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-area">
+            <div class="input-wrapper">
+                <input 
+                    type="text" 
+                    id="message-input" 
+                    placeholder="Type your message here..."
+                    onkeypress="handleKeyPress(event)"
+                    autocomplete="off"
+                >
+                <button id="send-btn" onclick="sendMessage()">
+                    <i class="fas fa-paper-plane"></i> Send
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_URL = "/chat";
+        let isDarkMode = true;
+
+        // DOM Elements
+        const messagesEl = document.getElementById('messages');
+        const inputEl = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            inputEl.focus();
+            addWelcomeMessage();
+        });
+
+        // Send message
+        async function sendMessage() {
+            const message = inputEl.value.trim();
+            if (!message) return;
+
+            // Disable input while processing
+            inputEl.disabled = true;
+            sendBtn.disabled = true;
+
+            // Add user message
+            addMessage(message, 'user');
+            inputEl.value = '';
+
+            // Show typing indicator
+            showTyping();
+
+            try {
+                // Send to server
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+
+                const data = await response.json();
+
+                // Hide typing
+                hideTyping();
+
+                // Add bot response
+                if (data.bot_response) {
+                    addMessage(data.bot_response, 'bot');
+                } else if (data.error) {
+                    addMessage(`Error: ${data.error}`, 'bot');
+                }
+
+            } catch (error) {
+                hideTyping();
+                addMessage("❌ Connection error. Make sure the server is running.", 'bot');
+                console.error('Error:', error);
+            } finally {
+                // Re-enable input
+                inputEl.disabled = false;
+                sendBtn.disabled = false;
+                inputEl.focus();
+            }
+        }
+
+        // Add message to chat
+        function addMessage(text, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            
+            const time = new Date().toLocaleTimeString([], { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+            
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    ${escapeHtml(text)}
+                    <div style="font-size: 0.8rem; opacity: 0.7; margin-top: 0.5rem; text-align: right;">
+                        ${time}
+                    </div>
+                </div>
+            `;
+            
+            messagesEl.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        // Show typing indicator
+        function showTyping() {
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'typing';
+            typingDiv.id = 'typing-indicator';
+            typingDiv.innerHTML = '<span></span><span></span><span></span>';
+            messagesEl.appendChild(typingDiv);
+            scrollToBottom();
+        }
+
+        // Hide typing indicator
+        function hideTyping() {
+            const typing = document.getElementById('typing-indicator');
+            if (typing) typing.remove();
+        }
+
+        // Send suggestion
+        function sendSuggestion(text) {
+            inputEl.value = text;
+            sendMessage();
+        }
+
+        // Clear chat
+        function clearChat() {
+            if (confirm('Clear all messages?')) {
+                messagesEl.innerHTML = '';
+                addWelcomeMessage();
+            }
+        }
+
+        // Toggle theme
+        function toggleTheme() {
+            isDarkMode = !isDarkMode;
+            const root = document.documentElement;
+            
+            if (isDarkMode) {
+                root.style.setProperty('--bg', '#0f172a');
+                root.style.setProperty('--card', '#1e293b');
+                root.style.setProperty('--text', '#f8fafc');
+            } else {
+                root.style.setProperty('--bg', '#f8fafc');
+                root.style.setProperty('--card', '#ffffff');
+                root.style.setProperty('--text', '#1e293b');
+                root.style.setProperty('--border', '#e2e8f0');
+            }
+        }
+
+        // Add welcome message
+        function addWelcomeMessage() {
+            setTimeout(() => {
+                addMessage("👋 Hello! I'm GBT-2, your fine-tuned AI assistant. I'm here to help with conversations, answer questions, and provide assistance. How can I help you today?", 'bot');
+            }, 500);
+        }
+
+        // Utility functions
+        function scrollToBottom() {
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
